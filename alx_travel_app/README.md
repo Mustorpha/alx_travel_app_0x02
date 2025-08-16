@@ -1,154 +1,216 @@
-# Django Listings Application
+# ALX Travel App 0x02 - Chapa Payment Integration
 
-This project is a Django-based application for managing listings, bookings, and reviews. The setup includes models, serializers, and seeders to populate the database with sample data for testing purposes.
+A Django REST API application for travel bookings with integrated Chapa payment processing.
 
 ## Features
 
-- **Listings**: Create and manage listings with details like name, description, price per night, and location.
-- **Bookings**: Allow users to book listings with defined start and end dates.
-- **Reviews**: Enable users to leave reviews with ratings and comments for listings.
+- **Travel Listings Management**: Create, read, update, and delete travel listings
+- **Booking System**: Users can book listings with date validation
+- **Chapa Payment Integration**: Secure payment processing using Chapa API
+- **Payment Verification**: Automatic payment status verification
+- **Email Notifications**: Automated email confirmations for successful/failed payments
+- **Background Tasks**: Celery integration for handling email notifications
+- **API Documentation**: Swagger UI for API documentation
+
+## Payment Integration Features
+
+### Chapa API Integration
+- Payment initiation through Chapa API
+- Real-time payment verification
+- Webhook support for payment status updates
+- Secure transaction handling
+- Support for multiple payment methods
+
+### Payment Workflow
+1. User creates a booking
+2. Payment is initiated through Chapa API
+3. User completes payment via Chapa checkout
+4. Payment status is verified automatically
+5. Email confirmation is sent upon successful payment
+6. Payment failures are handled gracefully with user notifications
 
 ## Setup Instructions
 
-### 1. Define Models
+### Prerequisites
+- Python 3.8+
+- MySQL/MariaDB
+- Redis (for Celery)
+- Chapa Developer Account
 
-Add the following models in `listings/models.py`:
+### Installation
 
-#### Listing Model
-```python
-class Listing(models.Model):
-    name = models.CharField(max_length=255)
-    description = models.TextField()
-    price_per_night = models.DecimalField(max_digits=10, decimal_places=2)
-    location = models.CharField(max_length=255)
-    created_at = models.DateTimeField(auto_now_add=True)
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd alx_travel_app_0x02
+   ```
 
-    def __str__(self):
-        return self.name
+2. **Create virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r alx_travel_app/requirement.txt
+   ```
+
+4. **Environment Configuration**
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Edit `.env` file with your configurations:
+   - Database credentials
+   - Chapa API secret key (from https://developer.chapa.co/)
+   - Email settings
+   - Redis configuration
+
+5. **Database Migration**
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
+
+6. **Create Superuser**
+   ```bash
+   python manage.py createsuperuser
+   ```
+
+7. **Run Development Server**
+   ```bash
+   python manage.py runserver
+   ```
+
+8. **Start Celery Worker** (in a separate terminal)
+   ```bash
+   celery -A alx_travel_app worker --loglevel=info
+   ```
+
+## API Endpoints
+
+### Bookings
+- `GET /api/bookings/` - List all bookings
+- `POST /api/bookings/` - Create a new booking
+- `GET /api/bookings/{id}/` - Get booking details
+- `POST /api/bookings/{id}/initiate_payment/` - Initiate payment for booking
+
+### Payments
+- `GET /api/payments/` - List user payments
+- `GET /api/payments/{id}/` - Get payment details
+- `POST /api/payments/{id}/verify_payment/` - Verify payment status
+- `POST /api/payments/webhook/` - Chapa webhook endpoint
+
+### Listings
+- `GET /api/listings/` - List all listings
+- `POST /api/listings/` - Create a new listing
+- `GET /api/listings/{id}/` - Get listing details
+
+## Payment Integration Usage
+
+### 1. Create a Booking
+```json
+POST /api/bookings/
+{
+    "listing": 1,
+    "start_date": "2024-08-20",
+    "end_date": "2024-08-25"
+}
 ```
 
-#### Booking Model
-```python
-class Booking(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    listing = models.ForeignKey(Listing, on_delete=models.CASCADE)
-    start_date = models.DateField()
-    end_date = models.DateField()
-    total_price = models.DecimalField(max_digits=10, decimal_places=2)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Booking by {self.user.username} for {self.listing.name}"
+### 2. Initiate Payment
+```json
+POST /api/bookings/{booking_id}/initiate_payment/
+{
+    "phone_number": "+251912345678",
+    "callback_url": "https://yourapp.com/payment/callback",
+    "return_url": "https://yourapp.com/payment/success"
+}
 ```
 
-#### Review Model
-```python
-class Review(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    listing = models.ForeignKey(Listing, on_delete=models.CASCADE)
-    rating = models.PositiveSmallIntegerField()  # 1 to 5
-    comment = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Review by {self.user.username} for {self.listing.name}"
+### 3. Payment Response
+```json
+{
+    "payment_id": 1,
+    "checkout_url": "https://checkout.chapa.co/checkout/payment/...",
+    "tx_ref": "unique-transaction-reference",
+    "message": "Payment initiated successfully"
+}
 ```
 
----
-
-### 2. Set Up Serializers
-
-Create serializers for the `Listing` and `Booking` models in `listings/serializers.py`:
-
-#### Listing Serializer
-```python
-class ListingSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Listing
-        fields = '__all__'
+### 4. Verify Payment
+```json
+POST /api/payments/{payment_id}/verify_payment/
 ```
 
-#### Booking Serializer
-```python
-class BookingSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Booking
-        fields = '__all__'
-```
+## Environment Variables
 
----
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `CHAPA_SECRET_KEY` | Chapa API secret key | `CHASECK_TEST-xxx` |
+| `DB_NAME` | Database name | `alx_travel_app` |
+| `DB_USER` | Database username | `root` |
+| `DB_PASSWORD` | Database password | `password` |
+| `EMAIL_HOST_USER` | Email sender | `noreply@yourapp.com` |
+| `CELERY_BROKER_URL` | Redis URL for Celery | `redis://localhost:6379` |
 
-### 3. Implement Seeders
+## Testing
 
-#### Create Seeder Command
+### Chapa Sandbox Testing
+1. Use Chapa's sandbox environment for testing
+2. Test payment initiation and verification
+3. Verify webhook functionality
+4. Test email notifications
 
-1. Create the directory structure `listings/management/commands` if it does not exist.
-2. Add a `seed.py` file in `commands/` with the following code:
-
-```python
-import random
-from django.core.management.base import BaseCommand
-from listings.models import Listing
-
-class Command(BaseCommand):
-    help = 'Seed the database with sample listings data'
-
-    def handle(self, *args, **kwargs):
-        sample_listings = [
-            {
-                "name": "Cozy Cottage",
-                "description": "A charming cottage in the countryside.",
-                "price_per_night": random.uniform(50, 150),
-                "location": "Countryside"
-            },
-            {
-                "name": "Modern Apartment",
-                "description": "A sleek and modern apartment in the city center.",
-                "price_per_night": random.uniform(100, 300),
-                "location": "City Center"
-            },
-            {
-                "name": "Beachfront Villa",
-                "description": "A luxurious villa right on the beach.",
-                "price_per_night": random.uniform(200, 500),
-                "location": "Beach"
-            },
-        ]
-
-        for listing_data in sample_listings:
-            Listing.objects.create(**listing_data)
-
-        self.stdout.write(self.style.SUCCESS("Successfully seeded the database with sample listings data."))
-```
-
----
-
-### 4. Run the Seeder
-
-#### Apply Migrations
-Run the following commands to apply migrations:
+### Test Payment Flow
 ```bash
-python manage.py makemigrations
-python manage.py migrate
+# Create test data
+python manage.py shell
+from listings.models import Listing, User
+from django.contrib.auth.models import User
+
+# Create test user
+user = User.objects.create_user('testuser', 'test@example.com', 'password')
+
+# Create test listing
+listing = Listing.objects.create(
+    name='Test Hotel',
+    description='A test hotel',
+    price_per_night=100.00
+)
 ```
 
-#### Populate the Database
-Run the seeder command to populate the database with sample listings:
-```bash
-python manage.py seed
-```
+## Error Handling
 
----
+- Payment failures are logged and users are notified via email
+- Failed payments can be retried
+- Webhook failures are logged for debugging
+- Network errors are handled gracefully with retries
 
-### 5. Verify
+## Security Features
 
-- Use the Django admin panel to view the `Listing`, `Booking`, and `Review` entries.
-- Alternatively, test your API endpoints to confirm the seeded data is accessible.
+- API authentication required for payment operations
+- Secure storage of Chapa credentials in environment variables
+- Transaction reference validation
+- Webhook signature verification (recommended for production)
 
----
+## Production Deployment
 
-## Additional Notes
+1. Set `DEBUG=False` in environment
+2. Configure proper email backend (SMTP)
+3. Use production Chapa credentials
+4. Set up proper logging
+5. Configure Redis for production
+6. Set up webhook URL in Chapa dashboard
 
-- Ensure you have the `User` model set up correctly for handling `ForeignKey` relationships.
-- Modify sample data as required for testing.
-- Extend serializers and views to include `Review` functionality if needed.
+## Support
+
+For issues and support:
+- Check Chapa documentation: https://developer.chapa.co/
+- Review Django REST Framework docs
+- Check Celery documentation for background tasks
+
+## License
+
+MIT License
